@@ -155,8 +155,8 @@ func _on_message_announced(text: String, libras_key: String, is_sound_cue: bool)
 
 	caption_label.text = text
 	caption_bar.visible = true
-	var speed_mult := 100.0 / float(maxi(50, AccessibilityManager.game_speed_percent))
-	_caption_timer.start(clampf(4.5 * speed_mult, 2.5, 9.0))
+	var rate := maxf(0.6, AccessibilityManager.tts_rate)
+	_caption_timer.start(clampf(4.8 / rate, 2.5, 9.0))
 
 
 func _update_libras_media(libras_key: String, fallback_text: String) -> void:

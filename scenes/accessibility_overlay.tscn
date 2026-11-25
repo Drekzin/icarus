@@ -161,7 +161,7 @@ layout_mode = 2
 size_flags_vertical = 3
 text = "• Menus — Setas, WASD ou Tab / Shift+Tab: navegar; Enter: confirmar; Esc: voltar.
 • Labirinto — W ou ↑: avançar; A/D ou ←/→: virar; S ou ↓: meia-volta.
-• Atalhos no jogo — E: Minimapa lateral; M: descrição completa; P: Fio de Ariadne (guia).
+• Atalhos no jogo — V: Interface Limpa / Painel; E: Minimapa; M: descrição completa; P: Fio de Ariadne.
 • H ou F1: abrir ou fechar esta ajuda a qualquer momento.
 • Todos os comandos podem ser remapeados em Opções → Controles (inclusive durante o jogo).
 

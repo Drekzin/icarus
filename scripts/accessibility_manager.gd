@@ -7,6 +7,7 @@ signal settings_changed
 signal message_announced(text: String, libras_key: String, is_sound_cue: bool)
 
 const SETTINGS_PATH := "user://settings.cfg"
+const SETTINGS_VERSION := 3
 
 const FONT_REGULAR_PATH := "res://assets/Font/PixeloidSans-lxa3y.ttf"
 const FONT_BOLD_PATH := "res://assets/Font/PixeloidSansBold-1jpBg.ttf"
@@ -14,8 +15,20 @@ const FONT_BOLD_PATH := "res://assets/Font/PixeloidSansBold-1jpBg.ttf"
 const CAPTION_MODES: Array[String] = ["Desligado", "Padrão", "LSE (com sons)"]
 const COLORBLIND_MODES: Array[String] = ["Nenhuma", "Protanopia", "Deuteranopia", "Tritanopia"]
 const FONT_STEPS: Array[int] = [100, 125, 150, 175, 200]
-const SPEED_STEPS: Array[int] = [50, 75, 100, 125, 150]
 const VOLUME_STEPS: Array[int] = [0, 25, 50, 75, 100]
+const TTS_RATE_STEPS: Array[float] = [0.6, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0]
+
+const PHONETIC_PT_KEYS: Dictionary = {
+	"A": "á", "B": "bê", "C": "cê", "D": "dê", "E": "é",
+	"F": "éfe", "G": "gê", "H": "agá", "I": "í", "J": "jóta",
+	"K": "cá", "L": "éle", "M": "ême", "N": "êne", "O": "ó",
+	"P": "pê", "Q": "quê", "R": "érre", "S": "ésse", "T": "tê",
+	"U": "ú", "V": "vê", "W": "dáblio", "X": "xis", "Y": "ípsilon", "Z": "zê",
+	"ESC": "Escape", "ESCAPE": "Escape", "TAB": "Tab",
+	"ENTER": "Enter", "RETURN": "Enter", "SPACE": "Espaço",
+	"F1": "éfe um", "UP": "seta para cima", "DOWN": "seta para baixo",
+	"LEFT": "seta para esquerda", "RIGHT": "seta para direita",
+}
 
 const REMAPPABLE_ACTIONS: Array[Dictionary] = [
 	{"action": "move_forward", "label": "Avançar", "default_key": KEY_W},
@@ -31,16 +44,20 @@ const REMAPPABLE_ACTIONS: Array[Dictionary] = [
 # Persisted settings (aligned with prototype defaults)
 var language: String = "pt_BR"
 var caption_mode: int = 2
+var show_tutorial_on_start: bool = true
 var libras_enabled: bool = true
+var vlibras_desktop_bridge: bool = false
 var tts_enabled: bool = true
+var tts_voice_id: String = ""
+var tts_rate: float = 1.0
 var audio_description: bool = true
 var minimap_visible: bool = false
 var font_scale_percent: int = 100
 var colorblind_mode: int = 0
-var game_speed_percent: int = 100
 var high_contrast: bool = true
 var fullscreen: bool = false
 var reduced_motion: bool = false
+var clean_hud_mode: bool = false
 var sfx_enabled: bool = true
 var sfx_volume_percent: int = 60
 
@@ -54,6 +71,8 @@ var _font_regular: Font
 var _font_bold: Font
 var _cached_tts_voice: String = ""
 var _tts_checked: bool = false
+var _re_paren_key: RegEx
+var _re_tecla_letter: RegEx
 
 var _audio_player: AudioStreamPlayer
 var _audio_gen: AudioStreamGenerator
@@ -63,6 +82,10 @@ var _phase: float = 0.0
 func _ready() -> void:
 	_font_regular = load(FONT_REGULAR_PATH)
 	_font_bold = load(FONT_BOLD_PATH)
+	_re_paren_key = RegEx.new()
+	_re_paren_key.compile("\\(([A-Za-z0-9_]+)\\)")
+	_re_tecla_letter = RegEx.new()
+	_re_tecla_letter.compile("(?i)\\btecla\\s+([A-Za-z])(?=$|[\\s,.;:!?])")
 	_setup_audio()
 	_ensure_default_actions()
 	load_settings()
@@ -114,20 +137,25 @@ func load_settings() -> void:
 	if err != OK:
 		return
 
+	var saved_ver := int(cfg.get_value("meta", "version", 1))
 	language = str(cfg.get_value("general", "language", language))
 	caption_mode = clampi(int(cfg.get_value("general", "caption_mode", caption_mode)), 0, CAPTION_MODES.size() - 1)
+	show_tutorial_on_start = bool(cfg.get_value("general", "show_tutorial_on_start", show_tutorial_on_start))
 
 	libras_enabled = bool(cfg.get_value("accessibility", "libras_enabled", libras_enabled))
+	vlibras_desktop_bridge = bool(cfg.get_value("accessibility", "vlibras_desktop_bridge", vlibras_desktop_bridge))
 	tts_enabled = bool(cfg.get_value("accessibility", "tts_enabled", tts_enabled))
+	tts_voice_id = str(cfg.get_value("accessibility", "tts_voice_id", tts_voice_id))
+	tts_rate = _nearest_float_step(float(cfg.get_value("accessibility", "tts_rate", tts_rate)), TTS_RATE_STEPS)
 	audio_description = bool(cfg.get_value("accessibility", "audio_description", audio_description))
 	minimap_visible = bool(cfg.get_value("accessibility", "minimap_visible", minimap_visible))
 	font_scale_percent = _nearest_step(int(cfg.get_value("accessibility", "font_scale_percent", font_scale_percent)), FONT_STEPS)
 	colorblind_mode = clampi(int(cfg.get_value("accessibility", "colorblind_mode", colorblind_mode)), 0, COLORBLIND_MODES.size() - 1)
-	game_speed_percent = _nearest_step(int(cfg.get_value("accessibility", "game_speed_percent", game_speed_percent)), SPEED_STEPS)
 	high_contrast = bool(cfg.get_value("accessibility", "high_contrast", high_contrast))
 
 	fullscreen = bool(cfg.get_value("video", "fullscreen", fullscreen))
 	reduced_motion = bool(cfg.get_value("video", "reduced_motion", reduced_motion))
+	clean_hud_mode = bool(cfg.get_value("video", "clean_hud_mode", clean_hud_mode))
 
 	sfx_enabled = bool(cfg.get_value("audio", "sfx_enabled", sfx_enabled))
 	sfx_volume_percent = clampi(int(cfg.get_value("audio", "sfx_volume_percent", sfx_volume_percent)), 0, 100)
@@ -141,23 +169,35 @@ func load_settings() -> void:
 			InputMap.action_erase_events(action_name)
 			InputMap.action_add_event(action_name, ev)
 
+	# Migrate older configs: ensure full panel & 100% TTS rate defaults.
+	if saved_ver < SETTINGS_VERSION:
+		if saved_ver < 2:
+			clean_hud_mode = false
+		tts_rate = 1.0
+		save_settings()
+
 
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "version", SETTINGS_VERSION)
 	cfg.set_value("general", "language", language)
 	cfg.set_value("general", "caption_mode", caption_mode)
+	cfg.set_value("general", "show_tutorial_on_start", show_tutorial_on_start)
 
 	cfg.set_value("accessibility", "libras_enabled", libras_enabled)
+	cfg.set_value("accessibility", "vlibras_desktop_bridge", vlibras_desktop_bridge)
 	cfg.set_value("accessibility", "tts_enabled", tts_enabled)
+	cfg.set_value("accessibility", "tts_voice_id", tts_voice_id)
+	cfg.set_value("accessibility", "tts_rate", tts_rate)
 	cfg.set_value("accessibility", "audio_description", audio_description)
 	cfg.set_value("accessibility", "minimap_visible", minimap_visible)
 	cfg.set_value("accessibility", "font_scale_percent", font_scale_percent)
 	cfg.set_value("accessibility", "colorblind_mode", colorblind_mode)
-	cfg.set_value("accessibility", "game_speed_percent", game_speed_percent)
 	cfg.set_value("accessibility", "high_contrast", high_contrast)
 
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("video", "reduced_motion", reduced_motion)
+	cfg.set_value("video", "clean_hud_mode", clean_hud_mode)
 
 	cfg.set_value("audio", "sfx_enabled", sfx_enabled)
 	cfg.set_value("audio", "sfx_volume_percent", sfx_volume_percent)
@@ -213,20 +253,37 @@ func reset_controls_to_default() -> void:
 	emit_settings_changed()
 
 
+func _nearest_float_step(value: float, steps: Array[float]) -> float:
+	var best: float = steps[0]
+	var best_diff: float = absf(value - best)
+	for s in steps:
+		var diff: float = absf(value - s)
+		if diff < best_diff:
+			best = s
+			best_diff = diff
+	return best
+
+
 func reset_all_settings() -> void:
 	language = "pt_BR"
 	caption_mode = 2
+	show_tutorial_on_start = true
 	libras_enabled = true
+	vlibras_desktop_bridge = false
 	tts_enabled = true
+	tts_voice_id = ""
+	tts_rate = 1.0
 	audio_description = true
+	minimap_visible = false
 	font_scale_percent = 100
 	colorblind_mode = 0
-	game_speed_percent = 100
 	high_contrast = true
 	fullscreen = false
 	reduced_motion = false
+	clean_hud_mode = false
 	sfx_enabled = true
 	sfx_volume_percent = 60
+	_tts_checked = false
 	reset_controls_to_default()
 	apply_window_mode()
 	emit_settings_changed()
@@ -289,15 +346,94 @@ func get_colorblind_mode_label() -> String:
 	return COLORBLIND_MODES[clampi(colorblind_mode, 0, COLORBLIND_MODES.size() - 1)]
 
 
+func _format_voice_lang(vlang: String) -> String:
+	var low := vlang.to_lower()
+	if low.begins_with("pt"):
+		return "Português"
+	if low.begins_with("en"):
+		return "Inglês"
+	if low.begins_with("es"):
+		return "Espanhol"
+	return vlang
+
+
+func get_available_tts_voices() -> Array[Dictionary]:
+	var result: Array[Dictionary] = [{"id": "", "label": "Automática (Português)"}]
+	if DisplayServer.get_name() == "headless":
+		return result
+	var voices: Array = DisplayServer.tts_get_voices()
+	var pt_voices: Array[Dictionary] = []
+	var other_voices: Array[Dictionary] = []
+	for v in voices:
+		var vid := str(v.get("id", ""))
+		var vname := str(v.get("name", vid))
+		var vlang := str(v.get("language", ""))
+		if vid.is_empty():
+			continue
+		var short_name := vname
+		for tag in ["pt_BR", "pt-BR", "pt_br", "pt-br"]:
+			short_name = short_name.replace(tag, "").strip_edges()
+		if short_name.length() > 28:
+			short_name = short_name.substr(0, 26) + "…"
+		var lang_label := _format_voice_lang(vlang)
+		var item := {"id": vid, "label": "%s (%s)" % [short_name, lang_label] if not lang_label.is_empty() else short_name}
+		if vlang.to_lower().begins_with("pt"):
+			pt_voices.append(item)
+		else:
+			other_voices.append(item)
+	result.append_array(pt_voices)
+	result.append_array(other_voices)
+	return result
+
+
+func get_current_tts_voice_label() -> String:
+	for entry in get_available_tts_voices():
+		if str(entry["id"]) == tts_voice_id:
+			return str(entry["label"])
+	return "Automática (Português)"
+
+
+func cycle_tts_voice(dir: int) -> String:
+	var list := get_available_tts_voices()
+	var idx := 0
+	for i in range(list.size()):
+		if str(list[i]["id"]) == tts_voice_id:
+			idx = i
+			break
+	idx = (idx + dir + list.size()) % list.size()
+	tts_voice_id = str(list[idx]["id"])
+	_tts_checked = false
+	emit_settings_changed()
+	return str(list[idx]["label"])
+
+
+func get_tts_rate_label() -> String:
+	return "%d%%" % int(round(tts_rate * 100.0))
+
+
+func step_tts_rate(dir: int) -> String:
+	var idx := TTS_RATE_STEPS.find(tts_rate)
+	if idx == -1:
+		idx = 2
+	idx = clampi(idx + dir, 0, TTS_RATE_STEPS.size() - 1)
+	tts_rate = TTS_RATE_STEPS[idx]
+	emit_settings_changed()
+	return get_tts_rate_label()
+
+
 func _get_tts_voice() -> String:
-	if _tts_checked:
-		return _cached_tts_voice
-	_tts_checked = true
 	if DisplayServer.get_name() == "headless":
 		return ""
 	var voices: Array = DisplayServer.tts_get_voices()
 	if voices.is_empty():
 		return ""
+	if not tts_voice_id.is_empty():
+		for v in voices:
+			if str(v.get("id", "")) == tts_voice_id:
+				return tts_voice_id
+	if _tts_checked and not _cached_tts_voice.is_empty():
+		return _cached_tts_voice
+	_tts_checked = true
 	for v in voices:
 		var lang := str(v.get("language", "")).to_lower()
 		if lang.begins_with("pt"):
@@ -307,22 +443,71 @@ func _get_tts_voice() -> String:
 	return _cached_tts_voice
 
 
+func sanitize_for_speech(text: String) -> String:
+	var s := text.replace("|", ", ")
+	for sym in ["✖", "✔", "⚠", "▶", "◀", "▲", "▼", "★", "◆", "●", "■", "·", "←", "→", "↑", "↓", "🤟"]:
+		s = s.replace(sym, " ")
+	var parts := s.split(" ", false)
+	return " ".join(parts).strip_edges()
+
+
+func format_key_for_speech(key_token: String) -> String:
+	var upper := key_token.strip_edges().to_upper()
+	return str(PHONETIC_PT_KEYS.get(upper, key_token))
+
+
+func format_for_tts(text: String) -> String:
+	var s := sanitize_for_speech(text)
+	if _re_tecla_letter != null:
+		var t_matches := _re_tecla_letter.search_all(s)
+		for i in range(t_matches.size() - 1, -1, -1):
+			var tm: RegExMatch = t_matches[i]
+			var letter := tm.get_string(1).to_upper()
+			if PHONETIC_PT_KEYS.has(letter):
+				var spoken_l := "tecla " + str(PHONETIC_PT_KEYS[letter])
+				s = s.substr(0, tm.get_start()) + spoken_l + s.substr(tm.get_end())
+
+	if _re_paren_key != null:
+		var matches := _re_paren_key.search_all(s)
+		for i in range(matches.size() - 1, -1, -1):
+			var m: RegExMatch = matches[i]
+			var raw_key := m.get_string(1)
+			var upper := raw_key.to_upper()
+			if PHONETIC_PT_KEYS.has(upper):
+				var spoken_key := str(PHONETIC_PT_KEYS[upper])
+				var repl := ", tecla " + spoken_key + ","
+				s = s.substr(0, m.get_start()) + repl + s.substr(m.get_end())
+
+	s = s.replace(" ,", ",").replace(",.", ".").replace(",,", ",").replace(",:", ":")
+	var parts := s.split(" ", false)
+	return " ".join(parts).strip_edges()
+
+
 func announce(text: String, libras_key: String = "", interrupt: bool = true) -> void:
 	var clean := text.strip_edges()
 	if clean.is_empty():
 		return
-	last_message = clean
+	var caption_text := sanitize_for_speech(clean)
+	if caption_text.is_empty():
+		caption_text = clean
+	last_message = caption_text
 	last_libras_key = libras_key
-	message_announced.emit(clean, libras_key, false)
+	message_announced.emit(caption_text, libras_key, false)
+
+	if vlibras_desktop_bridge and DisplayServer.get_name() != "headless":
+		DisplayServer.clipboard_set(caption_text)
 
 	if not tts_enabled:
 		return
 	var voice := _get_tts_voice()
 	if voice.is_empty():
 		return
+	var tts_text := format_for_tts(clean)
+	if tts_text.is_empty():
+		tts_text = caption_text
 	if interrupt:
 		DisplayServer.tts_stop()
-	DisplayServer.tts_speak(clean, voice, 75, 1.0, 1.0, 0, interrupt)
+	DisplayServer.tts_speak(tts_text, voice, 75, 1.0, tts_rate, 0, interrupt)
 
 
 func announce_sound_cue(cue_text: String) -> void:

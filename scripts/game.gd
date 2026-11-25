@@ -1,16 +1,24 @@
 extends Control
 
 ## Accessible turn-based first-person RPG gameplay controller for Labirinto de Ícaro.
-## Supports remappable actions, 100% keyboard navigation (Tab/Arrows/WASD/Enter/Esc),
-## structured audio descriptions (TTS), Ariadne's thread human guidance, stereo audio cues,
-## persistent right-side minimap, and in-game Options overlay without losing progress.
+## Supports clean HUD mode (default) or full accessibility panel mode (toggled with V),
+## remappable actions, 100% keyboard navigation, stereo audio cues, Ariadne's thread,
+## persistent right-side minimap, and in-game Options overlay.
 
 const OPTIONS_SCENE: PackedScene = preload("res://scenes/options.tscn")
 
 @onready var background_rect: ColorRect = $Background
 @onready var hud_panel: PanelContainer = $RootVBox/BodyMargin/BodyVBox/HudPanel
-@onready var objective_label: Label = $RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox/ObjectiveLabel
 @onready var stats_label: Label = $RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox/StatsLabel
+@onready var mode_toggle_button: Button = $RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox/ModeToggleButton
+@onready var top_minimap_button: Button = $RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox/TopMinimapButton
+@onready var top_options_button: Button = $RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox/TopOptionsButton
+@onready var top_pause_button: Button = $RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox/TopPauseButton
+
+@onready var clean_feedback_panel: PanelContainer = $RootVBox/BodyMargin/BodyVBox/CleanFeedbackPanel
+@onready var clean_feedback_label: Label = $RootVBox/BodyMargin/BodyVBox/CleanFeedbackPanel/CleanFeedbackLabel
+
+@onready var stage_col: VBoxContainer = $RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol
 @onready var corridor_panel: PanelContainer = $RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/CorridorPanel
 @onready var corridor_view: CorridorView = $RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/CorridorPanel/CorridorView
 
@@ -19,6 +27,7 @@ const OPTIONS_SCENE: PackedScene = preload("res://scenes/options.tscn")
 @onready var turn_around_button: Button = $RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/PadGrid/TurnAroundButton
 @onready var turn_right_button: Button = $RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/PadGrid/TurnRightButton
 
+@onready var info_col: VBoxContainer = $RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol
 @onready var feedback_panel: PanelContainer = $RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/FeedbackPanel
 @onready var feedback_label: Label = $RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/FeedbackPanel/FeedbackLabel
 @onready var danger_panel: PanelContainer = $RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/DangerPanel
@@ -55,8 +64,20 @@ const OPTIONS_SCENE: PackedScene = preload("res://scenes/options.tscn")
 @onready var pause_hint: Label = $PauseModal/Center/PausePanel/VBox/PauseHint
 @onready var resume_button: Button = $PauseModal/Center/PausePanel/VBox/ResumeButton
 @onready var pause_options_button: Button = $PauseModal/Center/PausePanel/VBox/PauseOptionsButton
+@onready var pause_tutorial_button: Button = $PauseModal/Center/PausePanel/VBox/PauseTutorialButton
 @onready var restart_button: Button = $PauseModal/Center/PausePanel/VBox/RestartButton
 @onready var back_to_menu_button: Button = $PauseModal/Center/PausePanel/VBox/BackToMenuButton
+
+@onready var tutorial_modal: ColorRect = $TutorialModal
+@onready var tutorial_panel: PanelContainer = $TutorialModal/Center/TutorialPanel
+@onready var tutorial_step_label: Label = $TutorialModal/Center/TutorialPanel/VBox/TutorialStepLabel
+@onready var tutorial_title_label: Label = $TutorialModal/Center/TutorialPanel/VBox/TutorialTitleLabel
+@onready var tutorial_body_label: Label = $TutorialModal/Center/TutorialPanel/VBox/TutorialBodyLabel
+@onready var tutorial_dont_show_button: Button = $TutorialModal/Center/TutorialPanel/VBox/TutorialDontShowButton
+@onready var tutorial_prev_button: Button = $TutorialModal/Center/TutorialPanel/VBox/TutorialButtons/TutorialPrevButton
+@onready var tutorial_repeat_button: Button = $TutorialModal/Center/TutorialPanel/VBox/TutorialButtons/TutorialRepeatButton
+@onready var tutorial_next_button: Button = $TutorialModal/Center/TutorialPanel/VBox/TutorialButtons/TutorialNextButton
+@onready var tutorial_skip_button: Button = $TutorialModal/Center/TutorialPanel/VBox/TutorialButtons/TutorialSkipButton
 
 @onready var end_modal: ColorRect = $EndModal
 @onready var end_panel: PanelContainer = $EndModal/Center/EndPanel
@@ -71,6 +92,8 @@ var maze: MazeData
 var _previous_focus: Control = null
 var _options_return_focus: Control = null
 var _base_texts: Dictionary = {}
+var _tutorial_step: int = 0
+var _tutorial_from_start: bool = false
 
 
 func _ready() -> void:
@@ -98,6 +121,11 @@ func _connect_buttons() -> void:
 	turn_right_button.pressed.connect(func() -> void: _do_turn(1))
 	turn_around_button.pressed.connect(func() -> void: _do_turn(2))
 
+	mode_toggle_button.pressed.connect(_toggle_clean_hud_mode)
+	top_minimap_button.pressed.connect(_toggle_side_minimap)
+	top_options_button.pressed.connect(_open_options_overlay)
+	top_pause_button.pressed.connect(_open_pause)
+
 	map_button.pressed.connect(_toggle_side_minimap)
 	expand_map_button.pressed.connect(_open_map)
 	describe_button.pressed.connect(_announce_scene_description)
@@ -111,12 +139,22 @@ func _connect_buttons() -> void:
 
 	resume_button.pressed.connect(_close_pause)
 	pause_options_button.pressed.connect(_open_options_overlay)
+	pause_tutorial_button.pressed.connect(func() -> void:
+		_close_pause_silent()
+		_open_tutorial(false)
+	)
 	restart_button.pressed.connect(func() -> void:
 		AccessibilityManager.play_ui_sound("confirm")
 		_close_pause_silent()
 		_start_new_run(false)
 	)
 	back_to_menu_button.pressed.connect(_go_to_menu)
+
+	tutorial_dont_show_button.pressed.connect(_on_toggle_tutorial_on_start)
+	tutorial_prev_button.pressed.connect(func() -> void: _step_tutorial(-1))
+	tutorial_repeat_button.pressed.connect(_announce_tutorial_step)
+	tutorial_next_button.pressed.connect(func() -> void: _step_tutorial(1))
+	tutorial_skip_button.pressed.connect(_close_tutorial)
 
 	play_again_button.pressed.connect(func() -> void:
 		AccessibilityManager.play_ui_sound("confirm")
@@ -127,9 +165,11 @@ func _connect_buttons() -> void:
 
 	var all_btns: Array[Button] = [
 		advance_button, turn_left_button, turn_around_button, turn_right_button,
+		mode_toggle_button, top_minimap_button, top_options_button, top_pause_button,
 		map_button, expand_map_button, describe_button, position_button, options_button, help_button, pause_button,
 		map_speak_button, map_close_button,
-		resume_button, pause_options_button, restart_button, back_to_menu_button,
+		resume_button, pause_options_button, pause_tutorial_button, restart_button, back_to_menu_button,
+		tutorial_dont_show_button, tutorial_prev_button, tutorial_repeat_button, tutorial_next_button, tutorial_skip_button,
 		play_again_button, end_menu_button,
 	]
 	for b in all_btns:
@@ -153,12 +193,12 @@ func _get_button_libras_key(btn: Button) -> String:
 		turn_left_button: return "esquerda"
 		turn_right_button: return "direita"
 		turn_around_button: return "meia_volta"
-		map_button, expand_map_button, map_speak_button: return "mapa"
+		map_button, top_minimap_button, expand_map_button, map_speak_button: return "mapa"
 		describe_button: return "repetir"
 		position_button: return "onde_estou"
-		options_button, pause_options_button: return "opcoes"
+		options_button, top_options_button, pause_options_button: return "opcoes"
 		help_button: return "ajuda"
-		pause_button, resume_button: return "pausa"
+		pause_button, top_pause_button, resume_button: return "pausa"
 		back_to_menu_button, end_menu_button: return "voltar"
 		play_again_button, restart_button: return "iniciar"
 	return ""
@@ -167,9 +207,15 @@ func _get_button_libras_key(btn: Button) -> String:
 func _setup_focus_navigation() -> void:
 	var main_order: Array[Button] = [
 		advance_button, turn_left_button, turn_around_button, turn_right_button,
-		map_button, describe_button, position_button, options_button, help_button, pause_button,
 	]
-	if AccessibilityManager.minimap_visible:
+	if info_col.visible:
+		main_order.append_array([
+			map_button, describe_button, position_button, options_button, help_button, pause_button,
+		])
+	main_order.append_array([
+		mode_toggle_button, top_minimap_button, top_options_button, top_pause_button,
+	])
+	if minimap_panel.visible:
 		main_order.append(expand_map_button)
 
 	for i in range(main_order.size()):
@@ -180,7 +226,6 @@ func _setup_focus_navigation() -> void:
 		main_order[i].focus_previous = main_order[i].get_path_to(prev_b)
 		main_order[i].focus_next = main_order[i].get_path_to(next_b)
 
-	# Modal focus loops so Tab/Arrows/WASD stay inside the active modal
 	map_speak_button.focus_neighbor_left = map_speak_button.get_path_to(map_close_button)
 	map_speak_button.focus_neighbor_right = map_speak_button.get_path_to(map_close_button)
 	map_speak_button.focus_next = map_speak_button.get_path_to(map_close_button)
@@ -191,7 +236,7 @@ func _setup_focus_navigation() -> void:
 	map_close_button.focus_next = map_close_button.get_path_to(map_speak_button)
 	map_close_button.focus_previous = map_close_button.get_path_to(map_speak_button)
 
-	var pause_order: Array[Button] = [resume_button, pause_options_button, restart_button, back_to_menu_button]
+	var pause_order: Array[Button] = [resume_button, pause_options_button, pause_tutorial_button, restart_button, back_to_menu_button]
 	for i in range(pause_order.size()):
 		var prev_p := pause_order[(i - 1 + pause_order.size()) % pause_order.size()]
 		var next_p := pause_order[(i + 1) % pause_order.size()]
@@ -199,6 +244,20 @@ func _setup_focus_navigation() -> void:
 		pause_order[i].focus_neighbor_bottom = pause_order[i].get_path_to(next_p)
 		pause_order[i].focus_previous = pause_order[i].get_path_to(prev_p)
 		pause_order[i].focus_next = pause_order[i].get_path_to(next_p)
+
+	var tut_order: Array[Button] = [tutorial_dont_show_button]
+	if tutorial_prev_button.visible:
+		tut_order.append(tutorial_prev_button)
+	tut_order.append_array([tutorial_repeat_button, tutorial_next_button, tutorial_skip_button])
+	for i in range(tut_order.size()):
+		var prev_t := tut_order[(i - 1 + tut_order.size()) % tut_order.size()]
+		var next_t := tut_order[(i + 1) % tut_order.size()]
+		tut_order[i].focus_neighbor_left = tut_order[i].get_path_to(prev_t)
+		tut_order[i].focus_neighbor_right = tut_order[i].get_path_to(next_t)
+		tut_order[i].focus_neighbor_top = tut_order[i].get_path_to(prev_t)
+		tut_order[i].focus_neighbor_bottom = tut_order[i].get_path_to(next_t)
+		tut_order[i].focus_previous = tut_order[i].get_path_to(prev_t)
+		tut_order[i].focus_next = tut_order[i].get_path_to(next_t)
 
 	play_again_button.focus_neighbor_left = play_again_button.get_path_to(end_menu_button)
 	play_again_button.focus_neighbor_right = play_again_button.get_path_to(end_menu_button)
@@ -222,6 +281,15 @@ func _input(event: InputEvent) -> void:
 		return
 	var kev := event as InputEventKey
 	if not kev.pressed or kev.echo:
+		return
+
+	if tutorial_modal.visible:
+		if kev.keycode == KEY_ESCAPE:
+			get_viewport().set_input_as_handled()
+			_close_tutorial()
+		elif event.is_action_pressed("repeat_description"):
+			get_viewport().set_input_as_handled()
+			_announce_tutorial_step()
 		return
 
 	if end_modal.visible:
@@ -258,6 +326,9 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed("turn_around") or kev.keycode == KEY_DOWN:
 		get_viewport().set_input_as_handled()
 		_do_turn(2)
+	elif kev.keycode == KEY_V:
+		get_viewport().set_input_as_handled()
+		_toggle_clean_hud_mode()
 	elif event.is_action_pressed("toggle_map"):
 		get_viewport().set_input_as_handled()
 		_toggle_side_minimap()
@@ -277,6 +348,7 @@ func _apply_accessibility() -> void:
 	var pal := AccessibilityManager.get_palette()
 	theme = th
 	hud_panel.theme = th
+	clean_feedback_panel.theme = th
 	corridor_panel.theme = th
 	feedback_panel.theme = th
 	danger_panel.theme = th
@@ -284,20 +356,36 @@ func _apply_accessibility() -> void:
 	minimap_panel.theme = th
 	map_panel.theme = th
 	pause_panel.theme = th
+	tutorial_panel.theme = th
 	end_panel.theme = th
 	background_rect.color = pal["bg"]
+
+	var clean_mode := AccessibilityManager.clean_hud_mode
+	info_col.visible = not clean_mode
+	clean_feedback_panel.visible = clean_mode
+	if clean_mode:
+		stage_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		stage_col.custom_minimum_size = Vector2(360, 0)
+	else:
+		stage_col.size_flags_horizontal = Control.SIZE_FILL
+		stage_col.custom_minimum_size = Vector2(400, 0)
 
 	minimap_panel.visible = AccessibilityManager.minimap_visible
 	libras_spacer.visible = AccessibilityManager.libras_enabled
 	right_col.visible = AccessibilityManager.minimap_visible or AccessibilityManager.libras_enabled
 
 	var body_sz := AccessibilityManager.get_scaled_font_size(14)
+	var top_btn_sz := clampi(AccessibilityManager.get_scaled_font_size(13), 12, 18)
 	var title_sz := mini(32, AccessibilityManager.get_scaled_font_size(20))
-	objective_label.add_theme_color_override("font_color", pal["accent"])
-	objective_label.add_theme_font_size_override("font_size", clampi(body_sz, 13, 22))
+
+	stats_label.add_theme_color_override("font_color", pal["accent"])
 	stats_label.add_theme_font_size_override("font_size", clampi(body_sz, 13, 22))
+	clean_feedback_label.add_theme_font_size_override("font_size", clampi(body_sz, 13, 20))
 	feedback_label.add_theme_font_size_override("font_size", clampi(body_sz, 13, 22))
 	danger_label.add_theme_font_size_override("font_size", clampi(body_sz, 13, 22))
+
+	for tb in [mode_toggle_button, top_minimap_button, top_options_button, top_pause_button]:
+		tb.add_theme_font_size_override("font_size", top_btn_sz)
 
 	mini_title.add_theme_color_override("font_color", pal["accent"])
 	mini_title.add_theme_font_size_override("font_size", clampi(body_sz, 13, 20))
@@ -313,6 +401,12 @@ func _apply_accessibility() -> void:
 	pause_title.add_theme_font_size_override("font_size", title_sz)
 	pause_hint.add_theme_font_size_override("font_size", clampi(body_sz, 14, 22))
 
+	tutorial_step_label.add_theme_color_override("font_color", pal["muted"])
+	tutorial_step_label.add_theme_font_size_override("font_size", clampi(body_sz, 13, 20))
+	tutorial_title_label.add_theme_color_override("font_color", pal["accent"])
+	tutorial_title_label.add_theme_font_size_override("font_size", title_sz)
+	tutorial_body_label.add_theme_font_size_override("font_size", clampi(body_sz, 14, 22))
+
 	end_title.add_theme_font_size_override("font_size", mini(36, AccessibilityManager.get_scaled_font_size(24)))
 	end_body.add_theme_font_size_override("font_size", clampi(body_sz, 15, 24))
 
@@ -323,7 +417,6 @@ func _apply_accessibility() -> void:
 
 
 func _style_movement_buttons() -> void:
-	# Prototype terracotta-orange movement pads with high-contrast black border and focus ring
 	var normal_sb := StyleBoxFlat.new()
 	normal_sb.bg_color = Color(0.85, 0.45, 0.16, 1.0)
 	normal_sb.border_color = Color(0.05, 0.05, 0.05, 1.0)
@@ -331,8 +424,8 @@ func _style_movement_buttons() -> void:
 	normal_sb.set_corner_radius_all(4)
 	normal_sb.content_margin_left = 6
 	normal_sb.content_margin_right = 6
-	normal_sb.content_margin_top = 6
-	normal_sb.content_margin_bottom = 6
+	normal_sb.content_margin_top = 4
+	normal_sb.content_margin_bottom = 4
 
 	var hover_sb := normal_sb.duplicate() as StyleBoxFlat
 	hover_sb.bg_color = Color(0.95, 0.55, 0.22, 1.0)
@@ -344,6 +437,7 @@ func _style_movement_buttons() -> void:
 	focus_sb.border_color = Color.WHITE
 	focus_sb.set_border_width_all(4)
 
+	var move_sz := clampi(AccessibilityManager.get_scaled_font_size(14), 12, 18)
 	for b in [advance_button, turn_left_button, turn_around_button, turn_right_button]:
 		b.add_theme_stylebox_override("normal", normal_sb)
 		b.add_theme_stylebox_override("hover", hover_sb)
@@ -351,6 +445,7 @@ func _style_movement_buttons() -> void:
 		b.add_theme_color_override("font_color", Color.BLACK)
 		b.add_theme_color_override("font_hover_color", Color.BLACK)
 		b.add_theme_color_override("font_focus_color", Color.BLACK)
+		b.add_theme_font_size_override("font_size", move_sz)
 
 
 func _update_dynamic_button_labels() -> void:
@@ -364,11 +459,16 @@ func _update_dynamic_button_labels() -> void:
 	var k_help := AccessibilityManager.get_action_key_label("toggle_help")
 
 	var mini_state := "Aberto" if AccessibilityManager.minimap_visible else "Fechado"
+	var mode_txt := "Painel (V)" if AccessibilityManager.clean_hud_mode else "Modo Limpo (V)"
 	_base_texts = {
 		advance_button: "▲ Avançar (%s)" % k_fwd,
 		turn_left_button: "◀ Esquerda (%s)" % k_left,
 		turn_around_button: "▼ Meia-volta (%s)" % k_back,
 		turn_right_button: "▶ Direita (%s)" % k_right,
+		mode_toggle_button: mode_txt,
+		top_minimap_button: "Mapa (%s)" % k_map,
+		top_options_button: "Opções",
+		top_pause_button: "Pausa (Esc)",
 		map_button: "Minimapa (%s): %s" % [k_map, mini_state],
 		expand_map_button: "Ampliar",
 		describe_button: "Ouvir descrição (%s)" % k_desc,
@@ -380,8 +480,14 @@ func _update_dynamic_button_labels() -> void:
 		map_close_button: "Fechar Mapa (Esc)",
 		resume_button: "Continuar (Esc)",
 		pause_options_button: "Opções",
+		pause_tutorial_button: "Ver Tutorial",
 		restart_button: "Reiniciar Labirinto",
 		back_to_menu_button: "Voltar ao Menu",
+		tutorial_dont_show_button: "Mostrar tutorial ao iniciar: " + ("Ligado" if AccessibilityManager.show_tutorial_on_start else "Desligado"),
+		tutorial_prev_button: "◀ Anterior",
+		tutorial_repeat_button: "Ouvir (%s)" % k_desc,
+		tutorial_next_button: "Começar a jogar!" if _tutorial_step >= 2 else "Próximo ▶",
+		tutorial_skip_button: "Pular (Esc)",
 		play_again_button: "Jogar de novo",
 		end_menu_button: "Voltar ao Menu",
 	}
@@ -395,18 +501,23 @@ func _refresh_focus_labels() -> void:
 		var base: String = str(_base_texts[btn])
 		btn.text = ("▶ " if focused == btn else "") + base
 		if "accessibility_name" in btn:
-			btn.set("accessibility_name", base)
+			btn.set("accessibility_name", AccessibilityManager.sanitize_for_speech(base))
 
 
 func _start_new_run(is_initial: bool) -> void:
 	maze.reset()
 	map_modal.visible = false
 	pause_modal.visible = false
+	tutorial_modal.visible = false
 	end_modal.visible = false
 	options_overlay_host.visible = false
 
 	_set_feedback("✔ Você entrou no labirinto. Chegue ao centro fugindo do monstro.", "ok")
 	_refresh_all_views()
+
+	if is_initial and AccessibilityManager.show_tutorial_on_start:
+		_open_tutorial(true)
+		return
 
 	AccessibilityManager.suppress_focus_announcements = true
 	advance_button.grab_focus()
@@ -420,6 +531,117 @@ func _start_new_run(is_initial: bool) -> void:
 		AccessibilityManager.announce.call_deferred(intro, "avancar")
 	else:
 		AccessibilityManager.announce(intro, "avancar")
+
+
+func _get_tutorial_steps() -> Array[Dictionary]:
+	var k_fwd := AccessibilityManager.get_action_key_label("move_forward")
+	var k_left := AccessibilityManager.get_action_key_label("turn_left")
+	var k_right := AccessibilityManager.get_action_key_label("turn_right")
+	var k_back := AccessibilityManager.get_action_key_label("turn_around")
+	var k_map := AccessibilityManager.get_action_key_label("toggle_map")
+	var k_desc := AccessibilityManager.get_action_key_label("repeat_description")
+	var k_pos := AccessibilityManager.get_action_key_label("announce_position")
+	var k_help := AccessibilityManager.get_action_key_label("toggle_help")
+
+	return [
+		{
+			"title": "Objetivo e Turnos",
+			"body": "Você está no Labirinto de Ícaro e precisa chegar ao centro dourado fugindo do Minotauro.\n• O jogo é por turnos e sem limite de tempo: pense com calma.\n• A cada 2 avanços seus, o monstro dá 1 passo.\n• Bater em parede avisa com som e texto, mas não gasta seu turno.",
+		},
+		{
+			"title": "Como se Movimentar",
+			"body": "Use o teclado ou os botões laranja na tela:\n• Avançar: (%s) ou Seta para cima\n• Virar à esquerda: (%s) ou Seta para esquerda\n• Virar à direita: (%s) ou Seta para direita\n• Meia-volta: (%s) ou Seta para baixo\nNos menus, use Setas, WASD ou Tab e confirme com Enter." % [k_fwd, k_left, k_right, k_back],
+		},
+		{
+			"title": "Recursos de Acessibilidade",
+			"body": "Atalhos disponíveis durante a partida:\n• (%s) Fio de Ariadne: guia você até o centro com áudio estéreo.\n• (%s) Ouvir descrição completa do corredor.\n• (%s) Abrir ou fechar o Minimapa 2D à direita.\n• (V) Alternar entre Painel Completo e Interface Limpa.\n• Opções: escolha voz, velocidade de narração, fonte, alto contraste e teclas.\n• (%s) ou (F1) Ajuda  |  (Esc) Pausar." % [k_pos, k_desc, k_map, k_help],
+		},
+	]
+
+
+func _open_tutorial(from_start: bool) -> void:
+	_tutorial_from_start = from_start
+	_tutorial_step = 0
+	tutorial_modal.visible = true
+	_render_tutorial_step(true)
+
+
+func _render_tutorial_step(defer_announce: bool = false) -> void:
+	var steps := _get_tutorial_steps()
+	_tutorial_step = clampi(_tutorial_step, 0, steps.size() - 1)
+	var data := steps[_tutorial_step]
+	tutorial_step_label.text = "TUTORIAL — Passo %d de %d" % [_tutorial_step + 1, steps.size()]
+	tutorial_title_label.text = str(data["title"])
+	tutorial_body_label.text = str(data["body"])
+	tutorial_prev_button.visible = _tutorial_step > 0
+
+	_setup_focus_navigation()
+	_update_dynamic_button_labels()
+
+	AccessibilityManager.suppress_focus_announcements = true
+	tutorial_next_button.grab_focus()
+	_refresh_focus_labels()
+	AccessibilityManager.suppress_focus_announcements = false
+
+	if defer_announce:
+		AccessibilityManager.announce.call_deferred(_build_tutorial_speech(), "ajuda")
+	else:
+		AccessibilityManager.announce(_build_tutorial_speech(), "ajuda")
+
+
+func _build_tutorial_speech() -> String:
+	var steps := _get_tutorial_steps()
+	var data := steps[_tutorial_step]
+	return "Tutorial, passo %d de %d. %s. %s" % [
+		_tutorial_step + 1,
+		steps.size(),
+		str(data["title"]),
+		str(data["body"]).replace("\n", " "),
+	]
+
+
+func _announce_tutorial_step() -> void:
+	AccessibilityManager.play_ui_sound("confirm")
+	AccessibilityManager.announce(_build_tutorial_speech(), "ajuda")
+
+
+func _step_tutorial(delta: int) -> void:
+	var steps := _get_tutorial_steps()
+	var next_step := _tutorial_step + delta
+	if next_step < 0:
+		return
+	if next_step >= steps.size():
+		_close_tutorial()
+		return
+	_tutorial_step = next_step
+	AccessibilityManager.play_ui_sound("confirm")
+	_render_tutorial_step(false)
+
+
+func _on_toggle_tutorial_on_start() -> void:
+	AccessibilityManager.show_tutorial_on_start = not AccessibilityManager.show_tutorial_on_start
+	AccessibilityManager.emit_settings_changed()
+	AccessibilityManager.play_ui_sound("adjust")
+	_update_dynamic_button_labels()
+	var state := "Ligado" if AccessibilityManager.show_tutorial_on_start else "Desligado"
+	AccessibilityManager.announce("Mostrar tutorial ao iniciar: " + state, "geral")
+
+
+func _close_tutorial() -> void:
+	tutorial_modal.visible = false
+	AccessibilityManager.play_ui_sound("back")
+	AccessibilityManager.suppress_focus_announcements = true
+	advance_button.grab_focus()
+	_refresh_focus_labels()
+	AccessibilityManager.suppress_focus_announcements = false
+
+	if _tutorial_from_start:
+		var intro := "Tutorial concluído. Labirinto de Ícaro. Objetivo: chegar ao centro fugindo do monstro."
+		if AccessibilityManager.audio_description:
+			intro += " " + maze.get_scene_description()
+		AccessibilityManager.announce(intro, "avancar")
+	else:
+		AccessibilityManager.announce("Tutorial fechado. Voltando ao jogo.", "avancar")
 
 
 func _refresh_all_views() -> void:
@@ -456,14 +678,28 @@ func _update_danger_panel() -> void:
 
 func _set_feedback(msg: String, kind: String) -> void:
 	var pal := AccessibilityManager.get_palette()
-	feedback_label.text = msg
+	var col: Color = pal["ok"]
 	match kind:
-		"err":
-			feedback_label.add_theme_color_override("font_color", pal["err"])
-		"warn":
-			feedback_label.add_theme_color_override("font_color", pal["accent"])
-		_:
-			feedback_label.add_theme_color_override("font_color", pal["ok"])
+		"err": col = pal["err"]
+		"warn": col = pal["accent"]
+	feedback_label.text = msg
+	feedback_label.add_theme_color_override("font_color", col)
+	clean_feedback_label.text = msg
+	clean_feedback_label.add_theme_color_override("font_color", col)
+
+
+func _toggle_clean_hud_mode() -> void:
+	AccessibilityManager.clean_hud_mode = not AccessibilityManager.clean_hud_mode
+	AccessibilityManager.emit_settings_changed()
+	AccessibilityManager.play_ui_sound("adjust")
+	var msg := "Modo interface limpa ativado." if AccessibilityManager.clean_hud_mode else "Painel completo ativado."
+	_set_feedback("✔ " + msg, "ok")
+	AccessibilityManager.announce(msg, "video")
+	if not info_col.visible:
+		AccessibilityManager.suppress_focus_announcements = true
+		advance_button.grab_focus()
+		_refresh_focus_labels()
+		AccessibilityManager.suppress_focus_announcements = false
 
 
 func _do_move_forward() -> void:
@@ -476,8 +712,8 @@ func _do_move_forward() -> void:
 		AccessibilityManager.play_game_sound("wall", 0.0)
 		AccessibilityManager.announce_sound_cue("[Som: parede de pedra à frente]")
 		corridor_view.trigger_bump_feedback()
-		var msg := "✖ Parede à frente. Vire à esquerda, à direita ou faça meia-volta. Seu turno não foi gasto."
-		_set_feedback(msg, "err")
+		var msg := "Parede à frente. Vire à esquerda, à direita ou faça meia-volta. Seu turno não foi gasto."
+		_set_feedback("✖ " + msg, "err")
 		AccessibilityManager.announce(msg, "parede")
 		return
 

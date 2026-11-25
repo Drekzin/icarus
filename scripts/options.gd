@@ -259,6 +259,7 @@ func _get_items_for_active_tab() -> Array[Dictionary]:
 			return [
 				{"key": "language", "label": "Idioma", "type": "info", "value": "Português (BR)"},
 				{"key": "caption_mode", "label": "Legenda", "type": "cycle", "value": AccessibilityManager.get_caption_mode_label()},
+				{"key": "show_tutorial", "label": "Tutorial ao iniciar", "type": "toggle", "value": "Ligado" if AccessibilityManager.show_tutorial_on_start else "Desligado"},
 				{"key": "reset_all", "label": "Restaurar todas as opções", "type": "action", "value": "Restaurar padrão"},
 			]
 		"controls":
@@ -279,6 +280,7 @@ func _get_items_for_active_tab() -> Array[Dictionary]:
 		"video":
 			return [
 				{"key": "fullscreen", "label": "Modo de tela", "type": "toggle", "value": "Tela cheia" if AccessibilityManager.fullscreen else "Janela"},
+				{"key": "clean_hud_mode", "label": "Interface limpa no jogo", "type": "toggle", "value": "Ligado" if AccessibilityManager.clean_hud_mode else "Desligado"},
 				{"key": "reduced_motion", "label": "Reduzir efeitos visuais", "type": "toggle", "value": "Ligado" if AccessibilityManager.reduced_motion else "Desligado"},
 			]
 		"audio":
@@ -288,13 +290,15 @@ func _get_items_for_active_tab() -> Array[Dictionary]:
 			]
 		"accessibility":
 			return [
-				{"key": "libras", "label": "VLibras", "type": "toggle", "value": "Ligado" if AccessibilityManager.libras_enabled else "Desligado"},
+				{"key": "libras", "label": "VLibras (janela no jogo)", "type": "toggle", "value": "Ligado" if AccessibilityManager.libras_enabled else "Desligado"},
+				{"key": "vlibras_desktop", "label": "VLibras Desktop (copiar falas)", "type": "toggle", "value": "Ligado" if AccessibilityManager.vlibras_desktop_bridge else "Desligado"},
 				{"key": "tts", "label": "Conversão de texto em fala", "type": "toggle", "value": "Ligado" if AccessibilityManager.tts_enabled else "Desligado"},
+				{"key": "tts_voice", "label": "Voz da narração", "type": "cycle", "value": AccessibilityManager.get_current_tts_voice_label()},
+				{"key": "tts_rate", "label": "Velocidade da narração", "type": "step", "value": AccessibilityManager.get_tts_rate_label()},
 				{"key": "audio_description", "label": "Audiodescrição", "type": "toggle", "value": "Ligado" if AccessibilityManager.audio_description else "Desligado"},
 				{"key": "minimap_visible", "label": "Minimapa lateral", "type": "toggle", "value": "Ligado" if AccessibilityManager.minimap_visible else "Desligado"},
 				{"key": "font_scale", "label": "Tamanho da fonte", "type": "step", "value": str(AccessibilityManager.font_scale_percent) + "%"},
 				{"key": "colorblind", "label": "Opções de cores", "type": "colorblind", "value": AccessibilityManager.get_colorblind_mode_label()},
-				{"key": "game_speed", "label": "Velocidade de jogo", "type": "step", "value": str(AccessibilityManager.game_speed_percent) + "%"},
 				{"key": "high_contrast", "label": "Alto Contraste", "type": "toggle", "value": "Ligado" if AccessibilityManager.high_contrast else "Desligado"},
 			]
 	return []
@@ -513,11 +517,19 @@ func _activate_item(key: String, row_type: String, dir: int) -> void:
 			AccessibilityManager.caption_mode = (AccessibilityManager.caption_mode + dir + n) % n
 			AccessibilityManager.emit_settings_changed()
 			_announce_change("Legenda", AccessibilityManager.get_caption_mode_label(), "geral")
+		"show_tutorial":
+			AccessibilityManager.show_tutorial_on_start = not AccessibilityManager.show_tutorial_on_start
+			AccessibilityManager.emit_settings_changed()
+			_announce_change("Tutorial ao iniciar", "Ligado" if AccessibilityManager.show_tutorial_on_start else "Desligado", "geral")
 		"fullscreen":
 			AccessibilityManager.fullscreen = not AccessibilityManager.fullscreen
 			AccessibilityManager.apply_window_mode()
 			AccessibilityManager.emit_settings_changed()
 			_announce_change("Modo de tela", "Tela cheia" if AccessibilityManager.fullscreen else "Janela", "video")
+		"clean_hud_mode":
+			AccessibilityManager.clean_hud_mode = not AccessibilityManager.clean_hud_mode
+			AccessibilityManager.emit_settings_changed()
+			_announce_change("Interface limpa no jogo", "Ligado" if AccessibilityManager.clean_hud_mode else "Desligado", "video")
 		"reduced_motion":
 			AccessibilityManager.reduced_motion = not AccessibilityManager.reduced_motion
 			AccessibilityManager.emit_settings_changed()
@@ -534,10 +546,20 @@ func _activate_item(key: String, row_type: String, dir: int) -> void:
 			AccessibilityManager.libras_enabled = not AccessibilityManager.libras_enabled
 			AccessibilityManager.emit_settings_changed()
 			_announce_change("VLibras", "Ligado" if AccessibilityManager.libras_enabled else "Desligado", "acessibilidade")
+		"vlibras_desktop":
+			AccessibilityManager.vlibras_desktop_bridge = not AccessibilityManager.vlibras_desktop_bridge
+			AccessibilityManager.emit_settings_changed()
+			_announce_change("VLibras Desktop", "Ligado" if AccessibilityManager.vlibras_desktop_bridge else "Desligado", "acessibilidade")
 		"tts":
 			AccessibilityManager.tts_enabled = not AccessibilityManager.tts_enabled
 			AccessibilityManager.emit_settings_changed()
 			_announce_change("Conversão de texto em fala", "Ligado" if AccessibilityManager.tts_enabled else "Desligado", "acessibilidade")
+		"tts_voice":
+			var vlabel := AccessibilityManager.cycle_tts_voice(dir)
+			_announce_change("Voz da narração", vlabel, "acessibilidade")
+		"tts_rate":
+			var rlabel := AccessibilityManager.step_tts_rate(dir)
+			_announce_change("Velocidade da narração", rlabel, "acessibilidade")
 		"audio_description":
 			AccessibilityManager.audio_description = not AccessibilityManager.audio_description
 			AccessibilityManager.emit_settings_changed()
@@ -555,10 +577,6 @@ func _activate_item(key: String, row_type: String, dir: int) -> void:
 			AccessibilityManager.colorblind_mode = (AccessibilityManager.colorblind_mode + dir + m) % m
 			AccessibilityManager.emit_settings_changed()
 			_announce_change("Opções de cores", AccessibilityManager.get_colorblind_mode_label(), "acessibilidade")
-		"game_speed":
-			AccessibilityManager.game_speed_percent = _step_value(AccessibilityManager.game_speed_percent, AccessibilityManager.SPEED_STEPS, dir)
-			AccessibilityManager.emit_settings_changed()
-			_announce_change("Velocidade de jogo", str(AccessibilityManager.game_speed_percent) + "%", "acessibilidade")
 		"high_contrast":
 			AccessibilityManager.high_contrast = not AccessibilityManager.high_contrast
 			AccessibilityManager.emit_settings_changed()

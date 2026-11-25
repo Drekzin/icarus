@@ -43,7 +43,7 @@ size_flags_vertical = 3
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_bottom = 10
 
 [node name="BodyVBox" type="VBoxContainer" parent="RootVBox/BodyMargin"]
 layout_mode = 2
@@ -54,18 +54,43 @@ layout_mode = 2
 
 [node name="HudHBox" type="HBoxContainer" parent="RootVBox/BodyMargin/BodyVBox/HudPanel"]
 layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="ObjectiveLabel" type="Label" parent="RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Objetivo: chegar ao centro (★) fugindo do monstro"
-autowrap_mode = 3
+theme_override_constants/separation = 8
 
 [node name="StatsLabel" type="Label" parent="RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox"]
 layout_mode = 2
-text = "Passos: 0  |  Leste"
-horizontal_alignment = 2
+size_flags_horizontal = 3
+text = "Entrada do Labirinto  |  Leste  |  Passos: 0"
+autowrap_mode = 3
+
+[node name="ModeToggleButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox"]
+custom_minimum_size = Vector2(138, 36)
+layout_mode = 2
+text = "Modo Limpo (V)"
+
+[node name="TopMinimapButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox"]
+custom_minimum_size = Vector2(114, 36)
+layout_mode = 2
+text = "Mapa (E)"
+
+[node name="TopOptionsButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox"]
+custom_minimum_size = Vector2(96, 36)
+layout_mode = 2
+text = "Opções"
+
+[node name="TopPauseButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/HudPanel/HudHBox"]
+custom_minimum_size = Vector2(122, 36)
+layout_mode = 2
+text = "Pausa (Esc)"
+
+[node name="CleanFeedbackPanel" type="PanelContainer" parent="RootVBox/BodyMargin/BodyVBox"]
+visible = false
+layout_mode = 2
+
+[node name="CleanFeedbackLabel" type="Label" parent="RootVBox/BodyMargin/BodyVBox/CleanFeedbackPanel"]
+layout_mode = 2
+text = "✔ Você entrou no labirinto. Chegue ao centro fugindo do monstro."
+horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="MainHBox" type="HBoxContainer" parent="RootVBox/BodyMargin/BodyVBox"]
 layout_mode = 2
@@ -73,7 +98,7 @@ size_flags_vertical = 3
 theme_override_constants/separation = 12
 
 [node name="StageCol" type="VBoxContainer" parent="RootVBox/BodyMargin/BodyVBox/MainHBox"]
-custom_minimum_size = Vector2(416, 0)
+custom_minimum_size = Vector2(400, 0)
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -82,7 +107,7 @@ layout_mode = 2
 size_flags_vertical = 3
 
 [node name="CorridorView" type="Control" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/CorridorPanel"]
-custom_minimum_size = Vector2(360, 360)
+custom_minimum_size = Vector2(300, 300)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -92,36 +117,36 @@ script = ExtResource("3_corridor")
 layout_mode = 2
 size_flags_horizontal = 4
 theme_override_constants/h_separation = 8
-theme_override_constants/v_separation = 8
+theme_override_constants/v_separation = 6
 columns = 3
 
 [node name="SpacerTL" type="Control" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/PadGrid"]
-custom_minimum_size = Vector2(130, 54)
+custom_minimum_size = Vector2(128, 46)
 layout_mode = 2
 mouse_filter = 2
 
 [node name="AdvanceButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/PadGrid"]
-custom_minimum_size = Vector2(130, 54)
+custom_minimum_size = Vector2(128, 46)
 layout_mode = 2
 text = "▲ Avançar"
 
 [node name="SpacerTR" type="Control" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/PadGrid"]
-custom_minimum_size = Vector2(130, 54)
+custom_minimum_size = Vector2(128, 46)
 layout_mode = 2
 mouse_filter = 2
 
 [node name="TurnLeftButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/PadGrid"]
-custom_minimum_size = Vector2(130, 54)
+custom_minimum_size = Vector2(128, 46)
 layout_mode = 2
 text = "◀ Esquerda"
 
 [node name="TurnAroundButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/PadGrid"]
-custom_minimum_size = Vector2(130, 54)
+custom_minimum_size = Vector2(128, 46)
 layout_mode = 2
 text = "▼ Meia-volta"
 
 [node name="TurnRightButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/StageCol/PadGrid"]
-custom_minimum_size = Vector2(130, 54)
+custom_minimum_size = Vector2(128, 46)
 layout_mode = 2
 text = "▶ Direita"
 
@@ -134,7 +159,7 @@ theme_override_constants/separation = 8
 layout_mode = 2
 
 [node name="FeedbackLabel" type="Label" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/FeedbackPanel"]
-custom_minimum_size = Vector2(0, 54)
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "✔ Você entrou no labirinto."
 autowrap_mode = 3
@@ -143,7 +168,7 @@ autowrap_mode = 3
 layout_mode = 2
 
 [node name="DangerLabel" type="Label" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/DangerPanel"]
-custom_minimum_size = Vector2(0, 56)
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Monstro distante."
 autowrap_mode = 3
@@ -157,37 +182,37 @@ layout_mode = 2
 theme_override_constants/separation = 6
 
 [node name="MapButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/ToolsPanel/ToolsVBox"]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_vertical = 3
 text = "Minimapa (E): Fechado"
 
 [node name="DescribeButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/ToolsPanel/ToolsVBox"]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_vertical = 3
 text = "Ouvir descrição (M)"
 
 [node name="PositionButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/ToolsPanel/ToolsVBox"]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_vertical = 3
 text = "Fio de Ariadne (P)"
 
 [node name="OptionsButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/ToolsPanel/ToolsVBox"]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_vertical = 3
 text = "Opções"
 
 [node name="HelpButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/ToolsPanel/ToolsVBox"]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_vertical = 3
 text = "Ajuda (H)"
 
 [node name="PauseButton" type="Button" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/InfoCol/ToolsPanel/ToolsVBox"]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_vertical = 3
 text = "Pausar / Menu (Esc)"
@@ -199,7 +224,7 @@ theme_override_constants/separation = 8
 
 [node name="MiniMapPanel" type="PanelContainer" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/RightCol"]
 visible = false
-custom_minimum_size = Vector2(266, 260)
+custom_minimum_size = Vector2(266, 252)
 layout_mode = 2
 
 [node name="MiniVBox" type="VBoxContainer" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/RightCol/MiniMapPanel"]
@@ -221,7 +246,7 @@ layout_mode = 2
 text = "Ampliar"
 
 [node name="SideMazeMapView" type="Control" parent="RootVBox/BodyMargin/BodyVBox/MainHBox/RightCol/MiniMapPanel/MiniVBox"]
-custom_minimum_size = Vector2(236, 178)
+custom_minimum_size = Vector2(236, 170)
 layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("4_mapview")
@@ -319,7 +344,7 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="PausePanel" type="PanelContainer" parent="PauseModal/Center"]
-custom_minimum_size = Vector2(440, 380)
+custom_minimum_size = Vector2(440, 420)
 layout_mode = 2
 
 [node name="VBox" type="VBoxContainer" parent="PauseModal/Center/PausePanel"]
@@ -339,22 +364,27 @@ horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="ResumeButton" type="Button" parent="PauseModal/Center/PausePanel/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 text = "Continuar (Esc)"
 
 [node name="PauseOptionsButton" type="Button" parent="PauseModal/Center/PausePanel/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 text = "Opções"
 
+[node name="PauseTutorialButton" type="Button" parent="PauseModal/Center/PausePanel/VBox"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+text = "Ver Tutorial"
+
 [node name="RestartButton" type="Button" parent="PauseModal/Center/PausePanel/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 text = "Reiniciar Labirinto"
 
 [node name="BackToMenuButton" type="Button" parent="PauseModal/Center/PausePanel/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 text = "Voltar ao Menu"
 
@@ -412,6 +442,79 @@ text = "Jogar de novo"
 custom_minimum_size = Vector2(210, 52)
 layout_mode = 2
 text = "Voltar ao Menu"
+
+[node name="TutorialModal" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.88)
+
+[node name="Center" type="CenterContainer" parent="TutorialModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TutorialPanel" type="PanelContainer" parent="TutorialModal/Center"]
+custom_minimum_size = Vector2(680, 440)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="TutorialModal/Center/TutorialPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TutorialStepLabel" type="Label" parent="TutorialModal/Center/TutorialPanel/VBox"]
+layout_mode = 2
+text = "TUTORIAL — Passo 1 de 3"
+horizontal_alignment = 1
+
+[node name="TutorialTitleLabel" type="Label" parent="TutorialModal/Center/TutorialPanel/VBox"]
+layout_mode = 2
+text = "Objetivo e Turnos"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="TutorialBodyLabel" type="Label" parent="TutorialModal/Center/TutorialPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+text = ""
+autowrap_mode = 3
+
+[node name="TutorialDontShowButton" type="Button" parent="TutorialModal/Center/TutorialPanel/VBox"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Mostrar tutorial ao iniciar: Ligado"
+
+[node name="TutorialButtons" type="HBoxContainer" parent="TutorialModal/Center/TutorialPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="TutorialPrevButton" type="Button" parent="TutorialModal/Center/TutorialPanel/VBox/TutorialButtons"]
+custom_minimum_size = Vector2(140, 48)
+layout_mode = 2
+text = "◀ Anterior"
+
+[node name="TutorialRepeatButton" type="Button" parent="TutorialModal/Center/TutorialPanel/VBox/TutorialButtons"]
+custom_minimum_size = Vector2(160, 48)
+layout_mode = 2
+text = "Ouvir (M)"
+
+[node name="TutorialNextButton" type="Button" parent="TutorialModal/Center/TutorialPanel/VBox/TutorialButtons"]
+custom_minimum_size = Vector2(170, 48)
+layout_mode = 2
+text = "Próximo ▶"
+
+[node name="TutorialSkipButton" type="Button" parent="TutorialModal/Center/TutorialPanel/VBox/TutorialButtons"]
+custom_minimum_size = Vector2(130, 48)
+layout_mode = 2
+text = "Pular (Esc)"
 
 [node name="OptionsOverlayHost" type="Control" parent="."]
 visible = false
